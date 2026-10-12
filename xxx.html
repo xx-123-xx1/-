@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PLC 段码屏模拟器 (共阴极)</title>
+<style>
+  body {
+    background-color: #1a1a1a;
+    color: #eee;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    margin: 0;
+    padding: 20px;
+  }
+
+  h1 {
+    color: #00ffcc;
+    margin-bottom: 5px;
+    font-size: 24px;
+  }
+
+  .subtitle {
+    color: #888;
+    margin-bottom: 30px;
+    font-size: 14px;
+  }
+
+  /* 数码管外壳 */
+  .segment-display {
+    position: relative;
+    width: 200px;
+    height: 300px;
+    background-color: #111;
+    border-radius: 15px;
+    padding: 20px;
+    box-shadow: inset 0 0 20px #000, 0 0 15px rgba(0, 255, 204, 0.1);
+    border: 2px solid #333;
+    margin-bottom: 40px;
+  }
+
+  /* 数码管背景网格，增加真实感 */
+  .segment-display::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+    background-size: 20px 20px;
+    border-radius: 15px;
+    pointer-events: none;
+  }
+
+  /* 段的通用样式 */
+  .seg {
+    position: absolute;
+    background-color: #222;
+    transition: background-color 0.1s, box-shadow 0.1s;
+    /* 未点亮时的微弱轮廓 */
+    border: 1px solid #1a1a1a; 
+  }
+
+  /* 点亮状态：共阴极，高电平亮（红色） */
+  .seg.on {
+    background-color: #ff2a2a;
+    box-shadow: 0 0 20px #ff2a2a, 0 0 40px rgba(255, 42, 42, 0.5);
+    border: 1px solid #ff5555;
+  }
+
+  /* 定义水平段 (a, g, d) 的形状 - 两端带斜角 */
+  .seg-h {
+    height: 18px;
+    width: 90px;
+    clip-path: polygon(10% 0%, 90% 0%, 100% 50%, 90% 100%, 10% 100%, 0% 50%);
+    left: 55px;
+  }
+
+  /* 定义垂直段 (b, c, e, f) 的形状 - 两端带斜角 */
+  .seg-v {
+    width: 18px;
+    高度: 90px;
+    剪辑路径: 多边形(0% 10%, 50% 0%, 100% 10%, 100% 90%, 50% 100%, 0% 90%);
+  }
+
+  /*各段位置定位*/
+  #seg-a { top: 25px; 左: 55px; }
+  #seg-b { top: 45px; 正确的: 20px; } /*右上角*/
+  #seg-c { 底部: 45px; 正确的: 20px; } /*右下角*/
+  #seg-d { 底部: 25px; 左: 55px; }
+  #seg-e { 底部: 45px; 左: 20px; } /*左下*/
+  #seg-f { top: 45px; 左: 20px; } /* 左上 */
+  #seg-g { top: 145px; 左: 55px; }
+
+  /* 控制面板 */
+  .控制面板 {
+    display: flex;
+    挠曲方向: column;
+    align-items: center;
+    gap: 15px;
+    width: 100%;
+    max-width: 320px;
+  }
+
+  .输入组 {
+    display: flex;
+    gap: 10px;
+    宽度: 100%;
+  }
+
+  输入[类型="数字"] {
+    弯曲: 1;
+    填充: 12PX 15PX;
+    字体大小: 18PX;
+    边界半径: 8PX;
+    边境: 2PX 固体 #444;
+    背景色: #222;
+    颜色：#fff；
+    概要: 没有一个;
+    文本对齐: 中心;
+    过渡: 边框颜色 0.3s;
+  }
+
+  输入[类型="数字"]:集中 {
+    边框颜色：#00ffcc；
+  }
+
+  按钮 {
+    填充: 12PX 20PX;
+    字体大小: 16PX;
+    边境: 没有一个;
+    边界半径: 8PX;
+    背景色：#00ffcc；
+    颜色: #111;
+    字体粗细: 大胆的;
+    光标: 指针;
+    过渡: 背景色 0.2s, 改变 0.1s;
+  }
+
+  按钮:盘旋 {
+    背景色：#00ccaa；
+  }
+
+  按钮:活跃的 {
+    改变: 规模(0.95);
+  }
+
+  /* 数字快捷键盘 */
+  .键盘 {
+    显示: 网格;
+    网格模板列: 重复(5, 1Fr);
+    差距: 8PX;
+    宽度: 100%;
+  }
+
+  .键盘 按钮 {
+    填充: 12PX 0;
+    字体大小: 18PX;
+    背景色: #333;
+    颜色：#ddd；
+    边境: 1PX 固体 #444;
+  }
+
+  .键盘 按钮:盘旋 {
+    背景色: #444;
+    颜色：#00ffcc；
+  }
+
+  .键盘 按钮.清楚的 {
+    格线柱: 跨度 5;
+    背景色: #661111;
+    颜色：#ff9999；
+  }
+
+  .键盘 按钮.清楚的:盘旋 {
+    背景色: #882222;
+  }
+
+  .状态 {
+    上边距: 10PX;
+    字体大小: 14PX;
+    颜色: #888;
+    高度: 20PX;
+  }
+</风格>
+</头>
+<身体>
+
+<H1>共阴极七段数码管模拟器</H1>
+<div 班级="副标题">输入 0-9，对应的段会点亮（高电平）</div>
+
+<!-- 数码管结构 -->
+<div 班级="段显示">
+<div 班级="seg seg-h" 身份标识="seg-a"></div>
+<div 班级="seg seg-v" 身份标识="seg-b"></div>
+<div 班级="seg seg-v" 身份标识="seg-c"></div>
+<div 班级="seg seg-h" 身份标识="SEG-D"></div>
+<div 班级="seg seg-v" 身份标识="seg-e"></div>
+<div 班级="seg seg-v" 身份标识="seg-f"></div>
+<div 班级="seg seg-h" 身份标识="seg-g"></div>
+</div>
+
+<div 班级="控制面板">
+<div 班级="输入组">
+<输入 类型="数字" 身份标识="numInput" 最小值="0" 最大值="9" 占位符="输入 0-9" 价值="0">
+<按钮 onClick="updateDisplay()">显示</按钮>
+</div>
+
+<div 班级="键盘">
+<按钮 onClick="setNumber(0)">0</按钮>
+<按钮 onClick="setNumber(1)">1</按钮>
+<按钮 onClick="setNumber(2)">2</按钮>
+<按钮 onClick="setNumber(3)">3</按钮>
+<按钮 onClick="setNumber(4)">4</按钮>
+<按钮 onClick="setNumber(5)">5</按钮>
+<按钮 onClick="setNumber(6)">6</按钮>
+<按钮 onClick="setNumber(7)">7</按钮>
+<按钮 onClick="setNumber(8)">8</按钮>
+<按钮 onClick="setNumber(9)">9</按钮>
+<按钮 班级="清除" onClick="clearDisplay()">熄灭 / 清零</按钮>
+</div>
+
+<div 班级="状态" 身份标识="状态">当前显示：0</div>
+</div>
+
+<脚本>
+  // 获取所有段元素
+Const分段={
+一个：文件.getElementById('seg-a')，
+b：文件.getElementById('seg-b')，
+c：文件.getElementById('seg-c')，
+d：文件.getElementById('SEG-D')，
+e：文件.getElementById('seg-e')，
+f：文件.getElementById('seg-f')，
+g：文件.getElementById('seg-g')
+  };
+
+//共阴极码表(与PLC中的十六进制码一一对应)
+//0x3F->a，b，c，d，e，f
+//0x06->B、c
+//0x5B->a、b、d、e、g
+//0x4F->a、b、c、d、g
+//0x66->B、c、f、g
+//0x6D->a、c、d、f、g
+//0x7D->a，c，d，e，f，g
+//0x07->a、b、c
+//0x7F->a、b、c、d、e、f、g
+//0x6F->a、b、c、d、f、g
+const digitMap={
+0：['a'，'B'，'c'，'d'，'e'，'f']，
+1：['B'，'c']，
+2：['a'，'B'，'g'，'e'，'d']，
+3：['a'，'B'，'g'，'c'，'d']，
+4：['f'，'g'，'B'，'c']，
+5：['a'，'f'，'g'，'c'，'d']，
+6：['a'，'f'，'g'，'e'，'d'，'c']，
+7：['a'，'B'，'c']，
+8：['a'，'B'，'c'，'d'，'e'，'f'，'g']，
+9：['a'，'B'，'c'，'d'，'f'，'g']
+  };
+
+  // 更新显示函数
+功能updateDisplay(){
+Const输入=文件.getElementById('numInput')；
+常量值=parseInt(输入.价值)；
+Const状态=文件.getElementById('状态')；
+
+    // 先熄灭所有段
+为 (让 钥匙 在…… 内 分段) {
+钥匙[钥匙]classList。移除('开')；
+}
+
+    // 如果输入是 0-9，则点亮对应的段
+如果(Val>=0&&Val<= 9) {
+常量activeSegments=digiTMap[Val]；
+activeSegments.forEach(SEG=>{
+分段.classList。添加('开')；
+>
+>
+状态。风格.颜色='#00ffcc'；状态。风格.颜色='#00ffcc'；
+}其他{}其他{
+      // 输入其他数字，全部熄灭// 输入其他数字，全部熄灭
+状态.内部文本='进口无效，数码管熄灭'；状态.内部文本='进口无效，数码管熄灭‘；
+状态。风格.颜色='#ff5555'；状态。风格.颜色='#ff5555'；
+}
+}
+
+'开'快捷键盘设置数字// 快捷键盘设置数字
+函数setNumber(NUM){函数setNumber(NUM){
+文件。getElementById('numInput').值=NUM；文档。getElementById('numInput').价值=NUM；
+updateDisplay()；updateDisplay()；
+}
+
+//清空/熄灭//清空/熄灭
+函数clearDisplay(){函数clearDisplay(){
+文件。getElementById('numInput')。值="；文档。getElementById('numInput')。价值="；
+为(让键入段){为(让key在...内分段){
+段[钥匙].类列表。移除('开')；段[钥匙].classList.remove('开')；
+}
+文件.getElementById('状态').内部文本='数码管已熄灭'；文档.getElementById('状态').内部文本='数码管已熄灭'；
+文件.getElementById('状态')。风格.颜色='#888'；文件。getElementById('状态')。风格.颜色='#888'；
+  }
+
+//监听输入框回车事件// 监听输入框回车事件
+'开'如果updateDisplay；).addEventListener('按下键'，功能(事件){文件.getElementById('numInput').addEventListener('按下键'，功能(事件){
+如果(事件.钥匙==='输入'){如果(事件.键==='进入'){
+updateDisplay()；updateDisplay()；
+    }
+  });
+
+  // 页面加载时默认显示 0// 页面加载时默认显示 0
+窗户.onload=updateDisplay；窗口.onload='开'身体
+'开'
+
+'开'身体
+</剧本></</
