@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>PLC彩灯模拟</title>
+<style>
+  body { font-family: sans-serif; text-align: center; padding: 30px; background: #111; color: #eee; }
+  .lamps { display: flex; justify-content: center; gap: 15px; flex-wrap: wrap; margin: 30px 0; }
+  .lamp { width: 70px; height: 70px; border-radius: 50%; background: #333; border: 3px solid #555; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #888; }
+  .lamp.on { background: radial-gradient(circle at 30% 30%, #ff0, #f80); color: #000; box-shadow: 0 0 25px #ff0; border-color: #ff0; }
+  input { font-size: 20px; width: 80px; text-align: center; padding: 8px; }
+  button { font-size: 18px; padding: 8px 18px; margin-left: 10px; cursor: pointer; }
+</style>
+</head>
+<body>
+  <h1>PLC 彩灯模拟</h1>
+  <p>输入数字 1~8，对应彩灯亮；其他数字全部灭。</p >
+  <input id="num" type="number" min="1" max="8" value="1">
+  <button onclick="showLamp()">显示</button>
+  <div class="lamps">
+    <div class="lamp" id="l1">1</div>
+    <div class="lamp" id="l2">2</div>
+    <div class="lamp" id="l3">3</div>
+    <div class="lamp" id="l4">4</div>
+    <div class="lamp" id="l5">5</div>
+    <div class="lamp" id="l6">6</div>
+    <div class="lamp" id="l7">7</div>
+    <div class="lamp" id="l8">8</div>
+  </div>
+  <script>
+    function showLamp() {
+      const n = parseInt(document.getElementById('num').value);
+      for (let i = 1; i <= 8; i++) {
+        const lamp = document.getElementById('l' + i);
+        if (i === n) {
+          lamp.classList.add('on');
+        } else {
+          lamp.classList.remove('on');
+        }
+      }
+    }
+    document.getElementById('num').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') showLamp();
+    });
+    showLamp();
+  </script>
+</body>
+</html>
